@@ -824,8 +824,6 @@
       } else {
         pins.forEach((pin, index) => {
           lines.push(`${index + 1}. ${pin.time || "시간 미정"} ${pin.name} (${index === 0 ? "도착" : moveMethodLabel(pin.moveMethod || state.defaultMoveMethod)})`);
-          lines.push(`   네이버: ${makeNaverPlaceUrl(pin)}`);
-          lines.push(`   카카오: ${makeKakaoLookUrl(pin)}`);
         });
       }
 
