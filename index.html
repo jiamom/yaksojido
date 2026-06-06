@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>약속지도</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #65707f;
+      --line: #d9dee7;
+      --paper: #f7f8fb;
+      --panel: #ffffff;
+      --green: #0e7c66;
+      --red: #d9473f;
+      --yellow: #f0b429;
+      --blue: #2671d9;
+      --orange: #df6b21;
+      --shadow: 0 18px 45px rgba(27, 39, 51, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      background: var(--paper);
+    }
+
+    button,
+    select,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(340px, 450px) minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 22px;
+      overflow: auto;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      color: #ffffff;
+      background: var(--green);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field label {
+      color: #344152;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: 11px 12px;
+      color: var(--ink);
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: none;
+    }
+
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(38, 113, 217, 0.14);
+    }
+
+    .field textarea {
+      min-height: 78px;
+      resize: vertical;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .actions,
+    .pin-actions,
+    .search-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn {
+      min-height: 38px;
+      padding: 9px 12px;
+      color: var(--ink);
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .btn:hover {
+      border-color: #aeb8c6;
+    }
+
+    .btn.primary {
+      color: #ffffff;
+      background: var(--blue);
+      border-color: var(--blue);
+    }
+
+    .btn.danger {
+      color: #ffffff;
+      background: var(--red);
+      border-color: var(--red);
+    }
+
+    .search-box {
+      display: grid;
+      gap: 8px;
+    }
+
+    .search-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+    }
+
+    .search-meta {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: 8px;
+    }
+
+    .search-results {
+      display: grid;
+      gap: 8px;
+    }
+
+    .result-card {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      background: #fbfcff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .result-card strong {
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+
+    .result-card small {
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .stop-card {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 10px;
+      padding: 12px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .stop-index {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      color: #ffffff;
+      background: var(--blue);
+      border-radius: 50%;
+      font-weight: 800;
+    }
+
+    .stop-main {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .stop-head {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .stop-head strong {
+      display: block;
+      line-height: 1.25;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+
+    .time-chip {
+      flex: 0 0 auto;
+      padding: 5px 8px;
+      color: #7a390d;
+      background: #fff0df;
+      border: 1px solid #ffd0a3;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .method-chip {
+      justify-self: start;
+      padding: 5px 8px;
+      color: #174d43;
+      background: #e8f6f1;
+      border: 1px solid #bfe3d8;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .coords {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .stop-card p {
+      margin: 0;
+      color: #465469;
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .map-wrap {
+      position: relative;
+      min-height: 100vh;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      min-height: 100vh;
+    }
+
+    .map-help {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 500;
+      max-width: min(360px, calc(100vw - 32px));
+      padding: 10px 12px;
+      color: #263241;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 10px 24px rgba(27, 39, 51, 0.12);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .share-toast {
+      position: absolute;
+      right: 22px;
+      bottom: 22px;
+      z-index: 500;
+      max-width: min(420px, calc(100vw - 44px));
+      padding: 12px 14px;
+      color: #ffffff;
+      background: rgba(23, 32, 42, 0.92);
+      border-radius: 8px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: 0.2s ease;
+      pointer-events: none;
+    }
+
+    .share-toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .route-marker {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      color: #ffffff;
+      background: var(--blue);
+      border: 3px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .leaflet-popup-content {
+      min-width: 190px;
+    }
+
+    .popup-title {
+      margin: 0 0 5px;
+      font-weight: 800;
+    }
+
+    .popup-note {
+      margin: 0;
+      color: #465469;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 860px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        max-height: 50vh;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .map-wrap,
+      #map {
+        min-height: 50vh;
+      }
+
+      .map-help {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <aside class="sidebar" aria-label="약속 일정과 장소 목록">
+      <div class="brand">
+        <h1>약속지도</h1>
+        <span class="badge">Meet Map</span>
+      </div>
+
+      <div class="field search-box">
+        <label for="placeSearch">장소 검색</label>
+        <div class="search-row">
+          <input id="placeSearch" placeholder="예: 11:00 석촌역, 서울숲" autocomplete="off">
+          <button class="btn primary" id="searchPlace" type="button">검색</button>
+        </div>
+        <div class="search-meta">
+          <input id="searchTime" placeholder="11:00" autocomplete="off">
+          <p class="hint">시간을 입력하면 검색 결과의 일정 추가에 바로 적용됩니다.</p>
+        </div>
+        <div class="search-results" id="searchResults"></div>
+      </div>
+
+      <div class="field">
+        <label for="meetingTitle">약속 이름</label>
+        <input id="meetingTitle" value="우리 약속 동선" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label for="meetingDate">약속 날짜</label>
+        <input id="meetingDate" placeholder="예: 6월 15일 토요일" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label for="defaultMoveMethod">기본 이동 방법</label>
+        <select id="defaultMoveMethod">
+          <option value="publictransit">버스/지하철</option>
+          <option value="bus">버스</option>
+          <option value="subway">지하철</option>
+          <option value="taxi">택시</option>
+          <option value="car">자가</option>
+          <option value="foot">걷기</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="meetingNote">안내 메모</label>
+        <textarea id="meetingNote" placeholder="회비, 준비물, 이동 방법 등을 적어두세요."></textarea>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="copyLink" type="button">공유 링크 복사</button>
+        <button class="btn primary" id="copyKakaoText" type="button">카톡 문구 복사</button>
+        <button class="btn" id="openKakaoRoute" type="button">카카오맵 경로</button>
+        <button class="btn" id="openNaverMap" type="button">네이버 지도</button>
+        <button class="btn" id="locateMe" type="button">현재 위치</button>
+        <button class="btn danger" id="clearAll" type="button">초기화</button>
+      </div>
+
+      <p class="hint">지도에서 장소를 클릭하거나 검색 결과를 일정에 추가하세요. 추가한 핀은 마우스로 끌어 위치를 조정할 수 있습니다.</p>
+
+      <div class="section-title">
+        <h2>시간대별 장소</h2>
+        <span id="pinCount" class="hint">0곳</span>
+      </div>
+
+      <div class="timeline" id="pins"></div>
+    </aside>
+
+    <section class="map-wrap" aria-label="이동 경로 지도">
+      <div id="map"></div>
+      <div class="map-help">핀 번호는 시간순 일정입니다. 선은 장소 간 이동 순서를 보여줍니다.</div>
+      <div id="toast" class="share-toast" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const COLORS = ["#2671d9", "#d9473f", "#0e7c66", "#f0b429", "#9b59b6", "#df6b21"];
+    const STORE_KEY = "meeting-route-share-state";
+    const DEFAULT_CENTER = [37.5665, 126.9780];
+
+    const state = normalizeState(loadState());
+    const markers = new Map();
+    let routeLine = null;
+    let pendingSearchTime = "";
+
+    const map = L.map("map", { zoomControl: false }).setView(state.center || DEFAULT_CENTER, state.zoom || 12);
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    const els = {
+      title: document.querySelector("#meetingTitle"),
+      date: document.querySelector("#meetingDate"),
+      defaultMoveMethod: document.querySelector("#defaultMoveMethod"),
+      note: document.querySelector("#meetingNote"),
+      search: document.querySelector("#placeSearch"),
+      searchTime: document.querySelector("#searchTime"),
+      searchButton: document.querySelector("#searchPlace"),
+      searchResults: document.querySelector("#searchResults"),
+      pins: document.querySelector("#pins"),
+      count: document.querySelector("#pinCount"),
+      copy: document.querySelector("#copyLink"),
+      copyKakaoText: document.querySelector("#copyKakaoText"),
+      openKakaoRoute: document.querySelector("#openKakaoRoute"),
+      openNaverMap: document.querySelector("#openNaverMap"),
+      locate: document.querySelector("#locateMe"),
+      clear: document.querySelector("#clearAll"),
+      toast: document.querySelector("#toast")
+    };
+
+    els.title.value = state.title;
+    els.date.value = state.date;
+    els.defaultMoveMethod.value = state.defaultMoveMethod;
+    els.note.value = state.note;
+
+    render();
+
+    map.on("click", (event) => {
+      const index = state.pins.length + 1;
+      const time = prompt("방문 시간을 입력하세요.", nextTimeLabel(index));
+      if (!time) return;
+
+      const name = prompt("장소 이름을 입력하세요.", `장소 ${index}`);
+      if (!name) return;
+
+      const note = prompt("장소 메모를 입력하세요.", "");
+      state.pins.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        order: index,
+        moveMethod: state.defaultMoveMethod,
+        time: time.trim(),
+        name: name.trim(),
+        note: (note || "").trim(),
+        lat: round(event.latlng.lat),
+        lng: round(event.latlng.lng),
+        color: COLORS[(index - 1) % COLORS.length]
+      });
+      persist();
+      render(true);
+    });
+
+    map.on("moveend", () => {
+      const center = map.getCenter();
+      state.center = [round(center.lat), round(center.lng)];
+      state.zoom = map.getZoom();
+      persist(false);
+    });
+
+    [els.title, els.date, els.note, els.defaultMoveMethod].forEach((el) => {
+      el.addEventListener("input", () => {
+        state.title = els.title.value.trim() || "우리 약속 동선";
+        state.date = els.date.value.trim();
+        state.defaultMoveMethod = els.defaultMoveMethod.value;
+        state.note = els.note.value.trim();
+        persist();
+      });
+    });
+
+    els.searchButton.addEventListener("click", searchPlaces);
+    els.search.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") searchPlaces();
+    });
+
+    els.copy.addEventListener("click", async () => {
+      const link = makeShareUrl();
+      try {
+        await navigator.clipboard.writeText(link);
+        showToast("공유 링크를 복사했습니다.");
+      } catch {
+        prompt("아래 링크를 복사하세요.", link);
+      }
+    });
+
+    els.copyKakaoText.addEventListener("click", async () => {
+      const text = makeKakaoShareText();
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("카톡에 붙여넣을 문구를 복사했습니다.");
+      } catch {
+        prompt("아래 문구를 복사해 카카오톡에 붙여넣으세요.", text);
+      }
+    });
+
+    els.openKakaoRoute.addEventListener("click", () => {
+      const url = makeKakaoRouteUrl();
+      if (!url) {
+        showToast("경로를 보려면 일정을 1곳 이상 추가하세요.");
+        return;
+      }
+      window.open(url, "_blank", "noopener");
+    });
+
+    els.openNaverMap.addEventListener("click", () => {
+      const pins = orderedPins();
+      if (!pins.length) {
+        showToast("네이버 지도에서 열 장소를 먼저 추가하세요.");
+        return;
+      }
+      window.open(makeNaverPlaceUrl(pins[0]), "_blank", "noopener");
+    });
+
+    els.locate.addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        showToast("이 브라우저에서는 현재 위치를 사용할 수 없습니다.");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          map.setView([position.coords.latitude, position.coords.longitude], 15);
+          showToast("현재 위치 근처로 이동했습니다.");
+        },
+        () => showToast("현재 위치를 가져오지 못했습니다.")
+      );
+    });
+
+    els.clear.addEventListener("click", () => {
+      if (!confirm("약속 정보와 모든 일정을 지울까요?")) return;
+      Object.assign(state, baseState());
+      location.hash = "";
+      persist();
+      map.setView(DEFAULT_CENTER, 12);
+      els.title.value = state.title;
+      els.date.value = "";
+      els.defaultMoveMethod.value = state.defaultMoveMethod;
+      els.note.value = "";
+      render();
+    });
+
+    function render(fitToRoute = false) {
+      document.title = state.title ? `${state.title} | 약속지도` : "약속지도";
+      els.count.textContent = `${state.pins.length}곳`;
+      renderPins();
+      renderMarkers();
+      renderRoute();
+      if (fitToRoute && state.pins.length) fitMapToPins();
+    }
+
+    function renderPins() {
+      els.pins.innerHTML = "";
+      const pins = orderedPins();
+      if (!pins.length) {
+        const empty = document.createElement("p");
+        empty.className = "hint";
+        empty.textContent = "아직 일정이 없습니다. 지도에서 첫 장소를 클릭해 추가하세요.";
+        els.pins.append(empty);
+        return;
+      }
+
+      pins.forEach((pin, index) => {
+        const card = document.createElement("article");
+        card.className = "stop-card";
+        card.innerHTML = `
+          <div class="stop-index">${index + 1}</div>
+          <div class="stop-main">
+            <div class="stop-head">
+              <div>
+                <strong></strong>
+                <div class="coords">${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}</div>
+              </div>
+              <span class="time-chip"></span>
+            </div>
+            <span class="method-chip"></span>
+            <p></p>
+            <div class="pin-actions">
+              <button class="btn" type="button" data-action="focus">지도 보기</button>
+              <button class="btn" type="button" data-action="naver">네이버</button>
+              <button class="btn" type="button" data-action="kakao">카카오</button>
+              <button class="btn" type="button" data-action="edit">수정</button>
+              <button class="btn danger" type="button" data-action="delete">삭제</button>
+            </div>
+          </div>
+        `;
+        card.querySelector(".stop-index").style.background = pin.color;
+        card.querySelector("strong").textContent = pin.name;
+        card.querySelector(".time-chip").textContent = pin.time || "시간 미정";
+        card.querySelector(".method-chip").textContent = `${index === 0 ? "도착" : "이동"}: ${moveMethodLabel(pin.moveMethod || state.defaultMoveMethod)}`;
+        card.querySelector("p").textContent = pin.note || "메모 없음";
+        card.querySelector('[data-action="focus"]').addEventListener("click", () => {
+          map.setView([pin.lat, pin.lng], Math.max(map.getZoom(), 16));
+          markers.get(pin.id).openPopup();
+        });
+        card.querySelector('[data-action="naver"]').addEventListener("click", () => {
+          window.open(makeNaverPlaceUrl(pin), "_blank", "noopener");
+        });
+        card.querySelector('[data-action="kakao"]').addEventListener("click", () => {
+          window.open(makeKakaoLookUrl(pin), "_blank", "noopener");
+        });
+        card.querySelector('[data-action="edit"]').addEventListener("click", () => editPin(pin.id));
+        card.querySelector('[data-action="delete"]').addEventListener("click", () => deletePin(pin.id));
+        els.pins.append(card);
+      });
+    }
+
+    async function searchPlaces() {
+      const parsed = parseSearchQuery(els.search.value);
+      pendingSearchTime = parsed.time;
+      if (parsed.time) {
+        els.searchTime.value = parsed.time;
+      }
+      if (!parsed.place) {
+        showToast("검색할 장소명을 입력하세요.");
+        return;
+      }
+
+      els.searchButton.disabled = true;
+      els.searchResults.innerHTML = '<p class="hint">검색 중입니다...</p>';
+
+      try {
+        const url = new URL("https://nominatim.openstreetmap.org/search");
+        url.searchParams.set("format", "jsonv2");
+        url.searchParams.set("limit", "5");
+        url.searchParams.set("accept-language", "ko");
+        url.searchParams.set("q", parsed.place);
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("search failed");
+        const results = await response.json();
+        renderSearchResults(results);
+      } catch {
+        els.searchResults.innerHTML = '<p class="hint">검색에 실패했습니다. 잠시 후 다시 시도하세요.</p>';
+      } finally {
+        els.searchButton.disabled = false;
+      }
+    }
+
+    function renderSearchResults(results) {
+      els.searchResults.innerHTML = "";
+      if (!results.length) {
+        els.searchResults.innerHTML = '<p class="hint">검색 결과가 없습니다.</p>';
+        return;
+      }
+
+      results.forEach((result) => {
+        const lat = Number(result.lat);
+        const lng = Number(result.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+        const card = document.createElement("article");
+        card.className = "result-card";
+        card.innerHTML = `
+          <strong></strong>
+          <small></small>
+          <div class="search-actions">
+            <button class="btn" type="button" data-action="move">지도 이동</button>
+            <button class="btn primary" type="button" data-action="add">일정 추가</button>
+          </div>
+        `;
+        card.querySelector("strong").textContent = result.name || result.display_name.split(",")[0];
+        card.querySelector("small").textContent = result.display_name;
+        card.querySelector('[data-action="move"]').addEventListener("click", () => {
+          map.setView([lat, lng], 16);
+          showToast("검색한 장소로 이동했습니다.");
+        });
+        card.querySelector('[data-action="add"]').addEventListener("click", () => {
+          addStopFromSearch({
+            name: result.name || result.display_name.split(",")[0],
+            lat,
+            lng
+          });
+        });
+        els.searchResults.append(card);
+      });
+    }
+
+    function addStopFromSearch(place) {
+      const index = state.pins.length + 1;
+      const time = normalizeTimeLabel(els.searchTime.value.trim() || pendingSearchTime || nextTimeLabel(index));
+      state.pins.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        order: index,
+        moveMethod: state.defaultMoveMethod,
+        time: time.trim(),
+        name: place.name.trim(),
+        note: "",
+        lat: round(place.lat),
+        lng: round(place.lng),
+        color: COLORS[(index - 1) % COLORS.length]
+      });
+      persist();
+      render(true);
+      showToast("검색한 장소를 일정에 추가했습니다.");
+    }
+
+    function makeKakaoShareText() {
+      const pins = orderedPins();
+      const lines = [
+        state.title,
+        state.date ? `날짜: ${state.date}` : "",
+        state.note ? `메모: ${state.note}` : "",
+        `기본 이동: ${moveMethodLabel(state.defaultMoveMethod)}`,
+        "",
+        "[일정]"
+      ].filter(Boolean);
+
+      if (!pins.length) {
+        lines.push("아직 장소가 없습니다.");
+      } else {
+        pins.forEach((pin, index) => {
+          lines.push(`${index + 1}. ${pin.time || "시간 미정"} ${pin.name} (${index === 0 ? "도착" : moveMethodLabel(pin.moveMethod || state.defaultMoveMethod)})`);
+          lines.push(`   네이버: ${makeNaverPlaceUrl(pin)}`);
+          lines.push(`   카카오: ${makeKakaoLookUrl(pin)}`);
+        });
+      }
+
+      const kakaoRoute = makeKakaoRouteUrl();
+      if (kakaoRoute) {
+        lines.push("");
+        lines.push(`카카오맵 경로: ${kakaoRoute}`);
+      }
+
+      lines.push("");
+      lines.push(`공유 페이지: ${makeShareUrl()}`);
+      return lines.join("\n");
+    }
+
+    function makeNaverPlaceUrl(pin) {
+      const query = encodeURIComponent(pin.name);
+      return `https://map.naver.com/p/search/${query}`;
+    }
+
+    function makeKakaoLookUrl(pin) {
+      return `http://m.map.kakao.com/scheme/look?p=${pin.lat},${pin.lng}`;
+    }
+
+    function makeKakaoRouteUrl() {
+      const pins = orderedPins();
+      if (!pins.length) return "";
+      if (pins.length === 1) return makeKakaoLookUrl(pins[0]);
+
+      const params = new URLSearchParams();
+      const start = pins[0];
+      const end = pins[pins.length - 1];
+      params.set("sp", `${start.lat},${start.lng}`);
+      pins.slice(1, -1).slice(0, 5).forEach((pin, index) => {
+        params.set(index === 0 ? "vp" : `vp${index + 1}`, `${pin.lat},${pin.lng}`);
+      });
+      params.set("ep", `${end.lat},${end.lng}`);
+      params.set("by", kakaoRouteMethod(state.defaultMoveMethod));
+      return `http://m.map.kakao.com/scheme/route?${params.toString()}`;
+    }
+
+    function parseSearchQuery(value) {
+      const raw = String(value || "").trim();
+      const match = raw.match(/^(\d{1,2}(?::\d{1,2})?|\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?)\s+(.+)$/);
+      if (!match) return { time: "", place: raw };
+      return {
+        time: normalizeTimeLabel(match[1]),
+        place: match[2].trim()
+      };
+    }
+
+    function normalizeTimeLabel(value) {
+      const text = String(value || "").replace(/\s/g, "");
+      const colon = text.match(/^(\d{1,2})(?::(\d{1,2}))?$/);
+      if (colon) return `${colon[1].padStart(2, "0")}:${(colon[2] || "00").padStart(2, "0")}`;
+      const korean = text.match(/^(\d{1,2})시(?:(\d{1,2})분)?$/);
+      if (korean) return `${korean[1].padStart(2, "0")}:${(korean[2] || "00").padStart(2, "0")}`;
+      return value;
+    }
+
+    function renderMarkers() {
+      const pins = orderedPins();
+      markers.forEach((marker, id) => {
+        if (!pins.some((pin) => pin.id === id)) {
+          marker.remove();
+          markers.delete(id);
+        }
+      });
+
+      pins.forEach((pin, index) => {
+        const icon = L.divIcon({
+          className: "",
+          html: `<span class="route-marker" style="background:${pin.color}">${index + 1}</span>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+          popupAnchor: [0, -18]
+        });
+        const popup = `
+          <div class="popup-title">${index + 1}. ${escapeHtml(pin.name)}</div>
+          <p class="popup-note"><strong>${escapeHtml(pin.time || "시간 미정")}</strong></p>
+          <p class="popup-note">${escapeHtml(pin.note || "메모 없음")}</p>
+        `;
+        if (markers.has(pin.id)) {
+          markers.get(pin.id).setLatLng([pin.lat, pin.lng]).setIcon(icon).bindPopup(popup);
+          attachMarkerDrag(markers.get(pin.id), pin.id);
+          return;
+        }
+        const marker = L.marker([pin.lat, pin.lng], { icon, draggable: true }).addTo(map).bindPopup(popup);
+        attachMarkerDrag(marker, pin.id);
+        markers.set(pin.id, marker);
+      });
+    }
+
+    function attachMarkerDrag(marker, id) {
+      marker.dragging.enable();
+      marker.off("dragend");
+      marker.on("dragend", () => {
+        const pin = state.pins.find((item) => item.id === id);
+        if (!pin) return;
+        const position = marker.getLatLng();
+        pin.lat = round(position.lat);
+        pin.lng = round(position.lng);
+        persist();
+        renderPins();
+        renderRoute();
+        showToast("핀 위치를 수정했습니다.");
+      });
+    }
+
+    function renderRoute() {
+      if (routeLine) {
+        routeLine.remove();
+        routeLine = null;
+      }
+      const path = orderedPins().map((pin) => [pin.lat, pin.lng]);
+      if (path.length < 2) return;
+      routeLine = L.polyline(path, {
+        color: "#df6b21",
+        weight: 5,
+        opacity: 0.88,
+        dashArray: "10 8",
+        lineJoin: "round"
+      }).addTo(map);
+    }
+
+    function editPin(id) {
+      const pin = state.pins.find((item) => item.id === id);
+      if (!pin) return;
+      const time = prompt("방문 시간을 수정하세요.", pin.time || "");
+      if (!time) return;
+      const name = prompt("장소 이름을 수정하세요.", pin.name);
+      if (!name) return;
+      const note = prompt("장소 메모를 수정하세요.", pin.note || "");
+      pin.time = time.trim();
+      pin.name = name.trim();
+      pin.note = (note || "").trim();
+      pin.moveMethod = promptMoveMethod(pin.moveMethod || state.defaultMoveMethod);
+      persist();
+      render(true);
+    }
+
+    function deletePin(id) {
+      state.pins = state.pins.filter((pin) => pin.id !== id);
+      state.pins = orderedPins().map((pin, index) => ({ ...pin, order: index + 1 }));
+      persist();
+      render(true);
+    }
+
+    function orderedPins() {
+      return [...state.pins].sort((a, b) => {
+        const byTime = timeValue(a.time) - timeValue(b.time);
+        if (byTime !== 0) return byTime;
+        return (a.order || 0) - (b.order || 0);
+      });
+    }
+
+    function timeValue(value) {
+      const match = String(value || "").match(/(\d{1,2})\s*[:시]\s*(\d{1,2})?/);
+      if (!match) return Number.MAX_SAFE_INTEGER;
+      return Number(match[1]) * 60 + Number(match[2] || 0);
+    }
+
+    function fitMapToPins() {
+      const points = orderedPins().map((pin) => L.latLng(pin.lat, pin.lng));
+      if (points.length === 1) {
+        map.setView(points[0], 16);
+        return;
+      }
+      map.fitBounds(L.latLngBounds(points).pad(0.2), { maxZoom: 15 });
+    }
+
+    function loadState() {
+      const fromHash = decodeHash();
+      if (fromHash) return fromHash;
+      try {
+        return JSON.parse(localStorage.getItem(STORE_KEY)) || baseState();
+      } catch {
+        return baseState();
+      }
+    }
+
+    function normalizeState(value) {
+      const fallback = baseState();
+      const next = { ...fallback, ...value };
+      next.date = next.date || next.when || "";
+      next.defaultMoveMethod = next.defaultMoveMethod || "publictransit";
+      next.pins = (next.pins || []).map((pin, index) => ({
+        id: pin.id || String(Date.now() + index),
+        order: pin.order || index + 1,
+        moveMethod: pin.moveMethod || next.defaultMoveMethod,
+        time: pin.time || "",
+        name: pin.name || `장소 ${index + 1}`,
+        note: pin.note || "",
+        lat: Number(pin.lat),
+        lng: Number(pin.lng),
+        color: pin.color || COLORS[index % COLORS.length]
+      })).filter((pin) => Number.isFinite(pin.lat) && Number.isFinite(pin.lng));
+      return next;
+    }
+
+    function baseState() {
+      return { title: "우리 약속 동선", date: "", note: "", defaultMoveMethod: "publictransit", pins: [], center: DEFAULT_CENTER, zoom: 12 };
+    }
+
+    function persist(updateHash = true) {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      if (updateHash) history.replaceState(null, "", makeShareUrl());
+    }
+
+    function makeShareUrl() {
+      const payload = {
+        title: state.title,
+        date: state.date,
+        note: state.note,
+        defaultMoveMethod: state.defaultMoveMethod,
+        pins: orderedPins(),
+        center: state.center,
+        zoom: state.zoom
+      };
+      return `${location.origin}${location.pathname}#data=${encodePayload(payload)}`;
+    }
+
+    function decodeHash() {
+      const hash = location.hash.replace(/^#data=/, "");
+      if (!hash || hash === location.hash) return null;
+      try {
+        return JSON.parse(decodeURIComponent(escape(atob(hash))));
+      } catch {
+        return null;
+      }
+    }
+
+    function encodePayload(value) {
+      return btoa(unescape(encodeURIComponent(JSON.stringify(value))));
+    }
+
+    function nextTimeLabel(index) {
+      const hour = 18 + Math.floor((index - 1) / 2);
+      const minute = (index - 1) % 2 === 0 ? "00" : "30";
+      return `${String(hour).padStart(2, "0")}:${minute}`;
+    }
+
+    function moveMethodLabel(value) {
+      return {
+        publictransit: "버스/지하철",
+        bus: "버스",
+        subway: "지하철",
+        taxi: "택시",
+        car: "자가",
+        foot: "걷기"
+      }[value] || "버스/지하철";
+    }
+
+    function kakaoRouteMethod(value) {
+      return {
+        publictransit: "publictransit",
+        bus: "publictransit",
+        subway: "publictransit",
+        taxi: "car",
+        car: "car",
+        foot: "foot"
+      }[value] || "publictransit";
+    }
+
+    function promptMoveMethod(current) {
+      const input = prompt("이 장소로 이동 방법을 입력하세요. (버스, 지하철, 택시, 자가, 걷기)", moveMethodLabel(current));
+      if (!input) return current;
+      const text = input.trim();
+      if (text.includes("버스") && text.includes("지하철")) return "publictransit";
+      if (text.includes("버스")) return "bus";
+      if (text.includes("지하철")) return "subway";
+      if (text.includes("택시")) return "taxi";
+      if (text.includes("자가") || text.includes("차")) return "car";
+      if (text.includes("걷") || text.includes("도보")) return "foot";
+      return current;
+    }
+
+    function round(value) {
+      return Math.round(value * 1000000) / 1000000;
+    }
+
+    function showToast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("visible");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => els.toast.classList.remove("visible"), 2200);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+  </script>
+</body>
+</html>
