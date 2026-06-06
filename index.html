@@ -511,7 +511,6 @@
         <button class="btn primary" id="copyLink" type="button">공유 링크 복사</button>
         <button class="btn primary" id="copyKakaoText" type="button">카톡 문구 복사</button>
         <button class="btn" id="openKakaoRoute" type="button">카카오맵 경로</button>
-        <button class="btn" id="openNaverMap" type="button">네이버 지도</button>
         <button class="btn" id="locateMe" type="button">현재 위치</button>
         <button class="btn danger" id="clearAll" type="button">초기화</button>
       </div>
@@ -623,7 +622,6 @@
       copy: document.querySelector("#copyLink"),
       copyKakaoText: document.querySelector("#copyKakaoText"),
       openKakaoRoute: document.querySelector("#openKakaoRoute"),
-      openNaverMap: document.querySelector("#openNaverMap"),
       locate: document.querySelector("#locateMe"),
       clear: document.querySelector("#clearAll"),
       toast: document.querySelector("#toast"),
@@ -747,15 +745,6 @@
       window.open(url, "_blank", "noopener");
     });
 
-    els.openNaverMap.addEventListener("click", () => {
-      const pins = orderedPins();
-      if (!pins.length) {
-        showToast("네이버 지도에서 열 장소를 먼저 추가하세요.");
-        return;
-      }
-      window.open(makeNaverPlaceUrl(pins[0]), "_blank", "noopener");
-    });
-
     els.locate.addEventListener("click", () => {
       if (!navigator.geolocation) {
         showToast("이 브라우저에서는 현재 위치를 사용할 수 없습니다.");
@@ -837,7 +826,6 @@
             <p></p>
             <div class="pin-actions">
               <button class="btn" type="button" data-action="focus">지도 보기</button>
-              <button class="btn" type="button" data-action="naver">네이버</button>
               <button class="btn" type="button" data-action="kakao">카카오</button>
               <button class="btn" type="button" data-action="edit">수정</button>
               <button class="btn danger" type="button" data-action="delete">삭제</button>
@@ -852,9 +840,6 @@
         card.querySelector('[data-action="focus"]').addEventListener("click", () => {
           setMapView(pin.lat, pin.lng, 16);
           openMarkerInfo(pin.id);
-        });
-        card.querySelector('[data-action="naver"]').addEventListener("click", () => {
-          window.open(makeNaverPlaceUrl(pin), "_blank", "noopener");
         });
         card.querySelector('[data-action="kakao"]').addEventListener("click", () => {
           window.open(makeKakaoLookUrl(pin), "_blank", "noopener");
@@ -1071,11 +1056,6 @@
       els.date.value = state.date;
       els.defaultMoveMethod.value = state.defaultMoveMethod;
       els.note.value = state.note;
-    }
-
-    function makeNaverPlaceUrl(pin) {
-      const query = encodeURIComponent(pin.name);
-      return `https://map.naver.com/p/search/${query}`;
     }
 
     function makeKakaoLookUrl(pin) {
