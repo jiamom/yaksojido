@@ -27,28 +27,28 @@ GitHub Pages만 쓰면 공유 링크는 스냅샷입니다. 한 사람이 수정
 Supabase에서 새 프로젝트를 만든 뒤 SQL Editor에서 아래 SQL을 실행합니다.
 
 ```sql
-create table if not exists public.plans (
-  id text primary key,
+create table if not exists public.yaksojido (
+  id bigint primary key,
   data jsonb not null,
   updated_at timestamptz not null default now()
 );
 
-alter table public.plans enable row level security;
+alter table public.yaksojido enable row level security;
 
-create policy "plans are readable by link id"
-on public.plans
+create policy "yaksojido plans are readable by link id"
+on public.yaksojido
 for select
 to anon
 using (true);
 
-create policy "plans can be created by link users"
-on public.plans
+create policy "yaksojido plans can be created by link users"
+on public.yaksojido
 for insert
 to anon
 with check (true);
 
-create policy "plans can be updated by link users"
-on public.plans
+create policy "yaksojido plans can be updated by link users"
+on public.yaksojido
 for update
 to anon
 using (true)
@@ -58,8 +58,9 @@ with check (true);
 그다음 `index.html`의 아래 값을 Supabase 프로젝트 값으로 채웁니다.
 
 ```js
-const SUPABASE_URL = "https://프로젝트아이디.supabase.co";
+const SUPABASE_URL = "https://xbvoqrvnyozilurrvvra.supabase.co";
 const SUPABASE_ANON_KEY = "public-anon-key";
+const SUPABASE_TABLE = "yaksojido";
 ```
 
 `anon key`는 브라우저 앱에서 쓰도록 설계된 공개 키입니다. 다만 현재 정책은 링크를 아는 사람이 수정할 수 있는 MVP 설정입니다. 나중에 수정 비밀번호나 편집 토큰을 추가하면 더 안전하게 만들 수 있습니다.

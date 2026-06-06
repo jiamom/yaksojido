@@ -479,8 +479,9 @@
     const COLORS = ["#2671d9", "#d9473f", "#0e7c66", "#f0b429", "#9b59b6", "#df6b21"];
     const STORE_KEY = "meeting-route-share-state";
     const DEFAULT_CENTER = [37.5665, 126.9780];
-    const SUPABASE_URL = "";
-    const SUPABASE_ANON_KEY = "";
+    const SUPABASE_URL = "https://xbvoqrvnyozilurrvvra.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_VgzvutLBYvvAUjmpMZJzEg_2_fxS155";
+    const SUPABASE_TABLE = "yaksojido";
 
     const state = normalizeState(loadState());
     state.planId = getPlanIdFromUrl() || state.planId || "";
@@ -849,13 +850,13 @@
       }
 
       try {
-        await supabaseRequest("/rest/v1/plans", {
+        await supabaseRequest(`/rest/v1/${SUPABASE_TABLE}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Prefer: "resolution=merge-duplicates"
           },
-          body: JSON.stringify([{ id: state.planId, data: makePayload() }])
+          body: JSON.stringify([{ id: Number(state.planId), data: makePayload() }])
         });
         persist();
         updateCloudStatus();
@@ -876,7 +877,7 @@
       }
 
       try {
-        const rows = await supabaseRequest(`/rest/v1/plans?id=eq.${encodeURIComponent(state.planId)}&select=data`, {
+        const rows = await supabaseRequest(`/rest/v1/${SUPABASE_TABLE}?id=eq.${encodeURIComponent(state.planId)}&select=data`, {
           method: "GET"
         });
         if (!rows.length) {
@@ -1156,8 +1157,9 @@
     }
 
     function makePlanId() {
-      if (crypto.randomUUID) return crypto.randomUUID().slice(0, 8);
-      return Math.random().toString(36).slice(2, 10);
+      const stamp = String(Date.now()).slice(-9);
+      const random = String(Math.floor(Math.random() * 900) + 100);
+      return `${stamp}${random}`;
     }
 
     function decodeHash() {
