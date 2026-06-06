@@ -20,6 +20,18 @@
 3. Branch는 `main`, folder는 `/root`를 선택하고 저장합니다.
 4. 잠시 후 `https://jiamom.github.io/yaksojido/` 주소로 접속합니다.
 
+## 카카오맵 설정
+
+기본 지도는 카카오맵 JavaScript SDK를 사용합니다.
+
+카카오맵이 뜨지 않으면 Kakao Developers의 앱 설정에서 Web 플랫폼 도메인에 아래 주소를 추가합니다.
+
+```text
+https://jiamom.github.io
+```
+
+로컬 파일(`file://`)에서는 카카오맵 도메인 제한 때문에 지도가 뜨지 않을 수 있습니다. GitHub Pages 주소에서 확인하는 것을 권장합니다.
+
 ## Supabase 저장 기능 설정
 
 GitHub Pages만 쓰면 공유 링크는 스냅샷입니다. 한 사람이 수정한 최신 내용을 모두가 보게 하려면 Supabase 같은 데이터 저장소가 필요합니다.

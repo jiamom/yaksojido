@@ -4,9 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>약속지도</title>
-  <link rel="preconnect" href="https://unpkg.com">
-  <link rel="preconnect" href="https://tile.openstreetmap.org">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="preconnect" href="https://dapi.kakao.com">
   <style>
     :root {
       color-scheme: light;
@@ -376,10 +374,11 @@
       box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
       font-size: 13px;
       font-weight: 900;
+      cursor: grab;
     }
 
-    .leaflet-popup-content {
-      min-width: 190px;
+    .route-marker:active {
+      cursor: grabbing;
     }
 
     .modal-backdrop {
@@ -586,7 +585,7 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=2c08437f08375d8697f1928bb8dc690c&autoload=false"></script>
   <script>
     const COLORS = ["#2671d9", "#d9473f", "#0e7c66", "#f0b429", "#9b59b6", "#df6b21"];
     const STORE_KEY = "meeting-route-share-state";
@@ -600,13 +599,8 @@
     const markers = new Map();
     let routeLine = null;
     let pendingSearchTime = "";
-
-    const map = L.map("map", { zoomControl: false }).setView(state.center || DEFAULT_CENTER, state.zoom || 12);
-    L.control.zoom({ position: "bottomright" }).addTo(map);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
+    let markerDragMoved = false;
+    let map = null;
 
     const els = {
       title: document.querySelector("#meetingTitle"),
@@ -654,34 +648,50 @@
     els.defaultMoveMethod.value = state.defaultMoveMethod;
     els.note.value = state.note;
 
-    render();
-    updateCloudStatus();
-    if (state.planId && isCloudConfigured()) {
-      loadCloudPlan();
+    kakao.maps.load(() => {
+      initMap();
+      bindMapEvents();
+      render();
+      updateCloudStatus();
+      if (state.planId && isCloudConfigured()) {
+        loadCloudPlan();
+      }
+    });
+
+    function initMap() {
+      const center = state.center || DEFAULT_CENTER;
+      map = new kakao.maps.Map(document.querySelector("#map"), {
+        center: toKakaoLatLng(center[0], center[1]),
+        level: zoomToKakaoLevel(state.zoom || 12)
+      });
+      map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
     }
 
-    map.on("click", (event) => {
-      const index = state.pins.length + 1;
-      openStopModal({
-        mode: "add",
-        title: "일정 추가",
-        values: {
-          time: nextTimeLabel(index),
-          name: `장소 ${index}`,
-          moveMethod: state.defaultMoveMethod,
-          note: "",
-          lat: round(event.latlng.lat),
-          lng: round(event.latlng.lng)
-        }
+    function bindMapEvents() {
+      kakao.maps.event.addListener(map, "click", (event) => {
+        const position = event.latLng;
+        const index = state.pins.length + 1;
+        openStopModal({
+          mode: "add",
+          title: "일정 추가",
+          values: {
+            time: nextTimeLabel(index),
+            name: `장소 ${index}`,
+            moveMethod: state.defaultMoveMethod,
+            note: "",
+            lat: round(position.getLat()),
+            lng: round(position.getLng())
+          }
+        });
       });
-    });
 
-    map.on("moveend", () => {
-      const center = map.getCenter();
-      state.center = [round(center.lat), round(center.lng)];
-      state.zoom = map.getZoom();
-      persist(false);
-    });
+      kakao.maps.event.addListener(map, "idle", () => {
+        const center = map.getCenter();
+        state.center = [round(center.getLat()), round(center.getLng())];
+        state.zoom = kakaoLevelToZoom(map.getLevel());
+        persist(false);
+      });
+    }
 
     [els.title, els.date, els.note, els.defaultMoveMethod].forEach((el) => {
       el.addEventListener("input", () => {
@@ -753,7 +763,7 @@
       }
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          map.setView([position.coords.latitude, position.coords.longitude], 15);
+          setMapView(position.coords.latitude, position.coords.longitude, 15);
           showToast("현재 위치 근처로 이동했습니다.");
         },
         () => showToast("현재 위치를 가져오지 못했습니다.")
@@ -770,7 +780,7 @@
           Object.assign(state, baseState());
           location.hash = "";
           persist();
-          map.setView(DEFAULT_CENTER, 12);
+          setMapView(DEFAULT_CENTER[0], DEFAULT_CENTER[1], 12);
           els.title.value = state.title;
           els.date.value = "";
           els.defaultMoveMethod.value = state.defaultMoveMethod;
@@ -840,8 +850,8 @@
         card.querySelector(".method-chip").textContent = `${index === 0 ? "도착" : "이동"}: ${moveMethodLabel(pin.moveMethod || state.defaultMoveMethod)}`;
         card.querySelector("p").textContent = pin.note || "메모 없음";
         card.querySelector('[data-action="focus"]').addEventListener("click", () => {
-          map.setView([pin.lat, pin.lng], Math.max(map.getZoom(), 16));
-          markers.get(pin.id).openPopup();
+          setMapView(pin.lat, pin.lng, 16);
+          openMarkerInfo(pin.id);
         });
         card.querySelector('[data-action="naver"]').addEventListener("click", () => {
           window.open(makeNaverPlaceUrl(pin), "_blank", "noopener");
@@ -912,7 +922,7 @@
         card.querySelector("strong").textContent = result.name || result.display_name.split(",")[0];
         card.querySelector("small").textContent = result.display_name;
         card.querySelector('[data-action="move"]').addEventListener("click", () => {
-          map.setView([lat, lng], 16);
+          setMapView(lat, lng, 16);
           showToast("검색한 장소로 이동했습니다.");
         });
         card.querySelector('[data-action="add"]').addEventListener("click", () => {
@@ -1112,65 +1122,134 @@
       const pins = orderedPins();
       markers.forEach((marker, id) => {
         if (!pins.some((pin) => pin.id === id)) {
-          marker.remove();
+          marker.overlay.setMap(null);
+          marker.marker.setMap(null);
           markers.delete(id);
         }
       });
 
       pins.forEach((pin, index) => {
-        const icon = L.divIcon({
-          className: "",
-          html: `<span class="route-marker" style="background:${pin.color}">${index + 1}</span>`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 15],
-          popupAnchor: [0, -18]
-        });
-        const popup = `
-          <div class="popup-title">${index + 1}. ${escapeHtml(pin.name)}</div>
-          <p class="popup-note"><strong>${escapeHtml(pin.time || "시간 미정")}</strong></p>
-          <p class="popup-note">${escapeHtml(pin.note || "메모 없음")}</p>
-        `;
+        const position = toKakaoLatLng(pin.lat, pin.lng);
+        const content = `<button class="route-marker" type="button" data-marker-id="${escapeHtml(pin.id)}" style="background:${pin.color}">${index + 1}</button>`;
         if (markers.has(pin.id)) {
-          markers.get(pin.id).setLatLng([pin.lat, pin.lng]).setIcon(icon).bindPopup(popup);
-          attachMarkerDrag(markers.get(pin.id), pin.id);
+          const entry = markers.get(pin.id);
+          entry.marker.setPosition(position);
+          entry.overlay.setPosition(position);
+          entry.overlay.setContent(content);
           return;
         }
-        const marker = L.marker([pin.lat, pin.lng], { icon, draggable: true }).addTo(map).bindPopup(popup);
-        attachMarkerDrag(marker, pin.id);
-        markers.set(pin.id, marker);
+
+        const marker = new kakao.maps.Marker({
+          position,
+          draggable: true,
+          opacity: 0
+        });
+        marker.setMap(map);
+
+        const overlay = new kakao.maps.CustomOverlay({
+          position,
+          content,
+          yAnchor: 0.5,
+          xAnchor: 0.5,
+          clickable: true
+        });
+        overlay.setMap(map);
+        markers.set(pin.id, { marker, overlay });
+        attachMarkerDrag(marker, overlay, pin.id);
       });
+      bindMarkerOverlayClicks();
     }
 
-    function attachMarkerDrag(marker, id) {
-      marker.dragging.enable();
-      marker.off("dragend");
-      marker.on("dragend", () => {
+    function attachMarkerDrag(marker, overlay, id) {
+      kakao.maps.event.addListener(marker, "dragend", () => {
         const pin = state.pins.find((item) => item.id === id);
         if (!pin) return;
-        const position = marker.getLatLng();
-        pin.lat = round(position.lat);
-        pin.lng = round(position.lng);
+        const position = marker.getPosition();
+        overlay.setPosition(position);
+        pin.lat = round(position.getLat());
+        pin.lng = round(position.getLng());
         persist();
         renderPins();
         renderRoute();
+        renderRoutePanel();
         showToast("핀 위치를 수정했습니다.");
+      });
+    }
+
+    function bindMarkerOverlayClicks() {
+      document.querySelectorAll("[data-marker-id]").forEach((button) => {
+        button.addEventListener("mousedown", (event) => startMarkerOverlayDrag(event, button.dataset.markerId));
+        button.addEventListener("click", () => {
+          if (markerDragMoved) {
+            markerDragMoved = false;
+            return;
+          }
+          openMarkerInfo(button.dataset.markerId);
+        });
+      });
+    }
+
+    function startMarkerOverlayDrag(event, id) {
+      event.preventDefault();
+      const entry = markers.get(id);
+      const pin = state.pins.find((item) => item.id === id);
+      if (!entry || !pin) return;
+
+      markerDragMoved = false;
+      map.setDraggable(false);
+
+      const move = (moveEvent) => {
+        markerDragMoved = true;
+        const rect = document.querySelector("#map").getBoundingClientRect();
+        const point = new kakao.maps.Point(moveEvent.clientX - rect.left, moveEvent.clientY - rect.top);
+        const position = map.getProjection().coordsFromContainerPoint(point);
+        entry.marker.setPosition(position);
+        entry.overlay.setPosition(position);
+        pin.lat = round(position.getLat());
+        pin.lng = round(position.getLng());
+        renderRoute();
+        renderRoutePanel();
+      };
+
+      const up = () => {
+        map.setDraggable(true);
+        if (markerDragMoved) {
+          persist();
+          renderPins();
+          showToast("핀 위치를 수정했습니다.");
+        }
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+      };
+
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up, { once: true });
+    }
+
+    function openMarkerInfo(id) {
+      const pin = state.pins.find((item) => item.id === id);
+      if (!pin) return;
+      openMessageModal({
+        title: pin.name,
+        message: `${pin.time || "시간 미정"}\n${pin.note || "메모 없음"}`
       });
     }
 
     function renderRoute() {
       if (routeLine) {
-        routeLine.remove();
+        routeLine.setMap(null);
         routeLine = null;
       }
-      const path = orderedPins().map((pin) => [pin.lat, pin.lng]);
+      const path = orderedPins().map((pin) => toKakaoLatLng(pin.lat, pin.lng));
       if (path.length < 2) return;
-      routeLine = L.polyline(path, {
-        color: "#df6b21",
-        weight: 5,
-        opacity: 0.88,
-        dashArray: "10 8",
-        lineJoin: "round"
-      }).addTo(map);
+      routeLine = new kakao.maps.Polyline({
+        path,
+        strokeWeight: 5,
+        strokeColor: "#df6b21",
+        strokeOpacity: 0.88,
+        strokeStyle: "shortdash"
+      });
+      routeLine.setMap(map);
     }
 
     function renderRoutePanel() {
@@ -1336,12 +1415,31 @@
     }
 
     function fitMapToPins() {
-      const points = orderedPins().map((pin) => L.latLng(pin.lat, pin.lng));
+      const points = orderedPins().map((pin) => toKakaoLatLng(pin.lat, pin.lng));
       if (points.length === 1) {
-        map.setView(points[0], 16);
+        setMapView(points[0].getLat(), points[0].getLng(), 16);
         return;
       }
-      map.fitBounds(L.latLngBounds(points).pad(0.2), { maxZoom: 15 });
+      const bounds = new kakao.maps.LatLngBounds();
+      points.forEach((point) => bounds.extend(point));
+      map.setBounds(bounds, 42, 42, 42, 42);
+    }
+
+    function setMapView(lat, lng, zoom = 15) {
+      map.setCenter(toKakaoLatLng(lat, lng));
+      map.setLevel(zoomToKakaoLevel(zoom));
+    }
+
+    function toKakaoLatLng(lat, lng) {
+      return new kakao.maps.LatLng(Number(lat), Number(lng));
+    }
+
+    function zoomToKakaoLevel(zoom) {
+      return Math.max(1, Math.min(14, 19 - Number(zoom || 12)));
+    }
+
+    function kakaoLevelToZoom(level) {
+      return Math.max(1, Math.min(19, 19 - Number(level || 7)));
     }
 
     function loadState() {
