@@ -11,11 +11,55 @@
 - 이동 방법 선택
 - 카카오톡 공유 문구 복사
 - 네이버 지도와 카카오맵 링크 연결
+- Supabase 설정 시 같은 약속 ID로 서버 저장/불러오기
 
 ## GitHub Pages 배포
 
-1. GitHub에서 새 저장소를 만듭니다.
-2. 이 폴더를 원격 저장소에 push합니다.
-3. 저장소의 `Settings > Pages`에서 배포 소스를 `Deploy from a branch`로 선택합니다.
-4. Branch는 `main`, folder는 `/root`를 선택하고 저장합니다.
-5. 잠시 후 `https://사용자명.github.io/저장소명/` 주소로 접속합니다.
+1. GitHub 저장소의 `Settings > Pages`로 이동합니다.
+2. Source를 `Deploy from a branch`로 선택합니다.
+3. Branch는 `main`, folder는 `/root`를 선택하고 저장합니다.
+4. 잠시 후 `https://jiamom.github.io/yaksojido/` 주소로 접속합니다.
+
+## Supabase 저장 기능 설정
+
+GitHub Pages만 쓰면 공유 링크는 스냅샷입니다. 한 사람이 수정한 최신 내용을 모두가 보게 하려면 Supabase 같은 데이터 저장소가 필요합니다.
+
+Supabase에서 새 프로젝트를 만든 뒤 SQL Editor에서 아래 SQL을 실행합니다.
+
+```sql
+create table if not exists public.plans (
+  id text primary key,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.plans enable row level security;
+
+create policy "plans are readable by link id"
+on public.plans
+for select
+to anon
+using (true);
+
+create policy "plans can be created by link users"
+on public.plans
+for insert
+to anon
+with check (true);
+
+create policy "plans can be updated by link users"
+on public.plans
+for update
+to anon
+using (true)
+with check (true);
+```
+
+그다음 `index.html`의 아래 값을 Supabase 프로젝트 값으로 채웁니다.
+
+```js
+const SUPABASE_URL = "https://프로젝트아이디.supabase.co";
+const SUPABASE_ANON_KEY = "public-anon-key";
+```
+
+`anon key`는 브라우저 앱에서 쓰도록 설계된 공개 키입니다. 다만 현재 정책은 링크를 아는 사람이 수정할 수 있는 MVP 설정입니다. 나중에 수정 비밀번호나 편집 토큰을 추가하면 더 안전하게 만들 수 있습니다.

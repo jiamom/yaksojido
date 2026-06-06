@@ -445,6 +445,9 @@
       </div>
 
       <div class="actions">
+        <button class="btn primary" id="newCloudPlan" type="button">새 공유 약속</button>
+        <button class="btn" id="saveCloudPlan" type="button">서버 저장</button>
+        <button class="btn" id="loadCloudPlan" type="button">서버 불러오기</button>
         <button class="btn primary" id="copyLink" type="button">공유 링크 복사</button>
         <button class="btn primary" id="copyKakaoText" type="button">카톡 문구 복사</button>
         <button class="btn" id="openKakaoRoute" type="button">카카오맵 경로</button>
@@ -453,6 +456,7 @@
         <button class="btn danger" id="clearAll" type="button">초기화</button>
       </div>
 
+      <p class="hint" id="cloudStatus">현재는 이 브라우저와 공유 링크에만 저장됩니다.</p>
       <p class="hint">지도에서 장소를 클릭하거나 검색 결과를 일정에 추가하세요. 추가한 핀은 마우스로 끌어 위치를 조정할 수 있습니다.</p>
 
       <div class="section-title">
@@ -475,8 +479,11 @@
     const COLORS = ["#2671d9", "#d9473f", "#0e7c66", "#f0b429", "#9b59b6", "#df6b21"];
     const STORE_KEY = "meeting-route-share-state";
     const DEFAULT_CENTER = [37.5665, 126.9780];
+    const SUPABASE_URL = "";
+    const SUPABASE_ANON_KEY = "";
 
     const state = normalizeState(loadState());
+    state.planId = getPlanIdFromUrl() || state.planId || "";
     const markers = new Map();
     let routeLine = null;
     let pendingSearchTime = "";
@@ -499,6 +506,10 @@
       searchResults: document.querySelector("#searchResults"),
       pins: document.querySelector("#pins"),
       count: document.querySelector("#pinCount"),
+      cloudStatus: document.querySelector("#cloudStatus"),
+      newCloudPlan: document.querySelector("#newCloudPlan"),
+      saveCloudPlan: document.querySelector("#saveCloudPlan"),
+      loadCloudPlan: document.querySelector("#loadCloudPlan"),
       copy: document.querySelector("#copyLink"),
       copyKakaoText: document.querySelector("#copyKakaoText"),
       openKakaoRoute: document.querySelector("#openKakaoRoute"),
@@ -514,6 +525,10 @@
     els.note.value = state.note;
 
     render();
+    updateCloudStatus();
+    if (state.planId && isCloudConfigured()) {
+      loadCloudPlan();
+    }
 
     map.on("click", (event) => {
       const index = state.pins.length + 1;
@@ -560,6 +575,16 @@
     els.search.addEventListener("keydown", (event) => {
       if (event.key === "Enter") searchPlaces();
     });
+
+    els.newCloudPlan.addEventListener("click", () => {
+      state.planId = makePlanId();
+      persist();
+      updateCloudStatus();
+      showToast("새 공유 약속 ID를 만들었습니다. 서버 저장을 누르면 공유됩니다.");
+    });
+
+    els.saveCloudPlan.addEventListener("click", saveCloudPlan);
+    els.loadCloudPlan.addEventListener("click", loadCloudPlan);
 
     els.copy.addEventListener("click", async () => {
       const link = makeShareUrl();
@@ -624,6 +649,7 @@
       els.defaultMoveMethod.value = state.defaultMoveMethod;
       els.note.value = "";
       render();
+      updateCloudStatus();
     });
 
     function render(fitToRoute = false) {
@@ -813,6 +839,93 @@
       return lines.join("\n");
     }
 
+    async function saveCloudPlan() {
+      if (!isCloudConfigured()) {
+        showToast("Supabase 설정값을 넣으면 서버 저장을 사용할 수 있습니다.");
+        return;
+      }
+      if (!state.planId) {
+        state.planId = makePlanId();
+      }
+
+      try {
+        await supabaseRequest("/rest/v1/plans", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates"
+          },
+          body: JSON.stringify([{ id: state.planId, data: makePayload() }])
+        });
+        persist();
+        updateCloudStatus();
+        showToast("서버에 저장했습니다. 같은 링크로 최신 내용을 볼 수 있습니다.");
+      } catch {
+        showToast("서버 저장에 실패했습니다. Supabase 설정과 테이블을 확인하세요.");
+      }
+    }
+
+    async function loadCloudPlan() {
+      if (!isCloudConfigured()) {
+        showToast("Supabase 설정값을 넣으면 서버 불러오기를 사용할 수 있습니다.");
+        return;
+      }
+      if (!state.planId) {
+        showToast("불러올 약속 ID가 없습니다.");
+        return;
+      }
+
+      try {
+        const rows = await supabaseRequest(`/rest/v1/plans?id=eq.${encodeURIComponent(state.planId)}&select=data`, {
+          method: "GET"
+        });
+        if (!rows.length) {
+          showToast("서버에서 약속을 찾지 못했습니다.");
+          return;
+        }
+        const loaded = normalizeState({ ...rows[0].data, planId: state.planId });
+        Object.assign(state, loaded);
+        syncFormFromState();
+        persist(false);
+        render(true);
+        updateCloudStatus();
+        showToast("서버에서 최신 약속을 불러왔습니다.");
+      } catch {
+        showToast("서버 불러오기에 실패했습니다.");
+      }
+    }
+
+    async function supabaseRequest(path, options) {
+      const response = await fetch(`${SUPABASE_URL}${path}`, {
+        ...options,
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          ...(options.headers || {})
+        }
+      });
+      if (!response.ok) throw new Error("Supabase request failed");
+      if (response.status === 204) return null;
+      return response.json();
+    }
+
+    function isCloudConfigured() {
+      return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+    }
+
+    function updateCloudStatus() {
+      const mode = isCloudConfigured() ? "서버 저장 가능" : "서버 설정 전";
+      const idText = state.planId ? `약속 ID: ${state.planId}` : "약속 ID 없음";
+      els.cloudStatus.textContent = `${mode} · ${idText}`;
+    }
+
+    function syncFormFromState() {
+      els.title.value = state.title;
+      els.date.value = state.date;
+      els.defaultMoveMethod.value = state.defaultMoveMethod;
+      els.note.value = state.note;
+    }
+
     function makeNaverPlaceUrl(pin) {
       const query = encodeURIComponent(pin.name);
       return `https://map.naver.com/p/search/${query}`;
@@ -984,6 +1097,7 @@
       const next = { ...fallback, ...value };
       next.date = next.date || next.when || "";
       next.defaultMoveMethod = next.defaultMoveMethod || "publictransit";
+      next.planId = next.planId || "";
       next.pins = (next.pins || []).map((pin, index) => ({
         id: pin.id || String(Date.now() + index),
         order: pin.order || index + 1,
@@ -999,25 +1113,51 @@
     }
 
     function baseState() {
-      return { title: "우리 약속 동선", date: "", note: "", defaultMoveMethod: "publictransit", pins: [], center: DEFAULT_CENTER, zoom: 12 };
+      return { title: "우리 약속 동선", date: "", note: "", defaultMoveMethod: "publictransit", planId: "", pins: [], center: DEFAULT_CENTER, zoom: 12 };
     }
 
     function persist(updateHash = true) {
       localStorage.setItem(STORE_KEY, JSON.stringify(state));
-      if (updateHash) history.replaceState(null, "", makeShareUrl());
+      if (updateHash) history.replaceState(null, "", makeBrowserUrl());
     }
 
-    function makeShareUrl() {
-      const payload = {
+    function makePayload() {
+      return {
         title: state.title,
         date: state.date,
         note: state.note,
         defaultMoveMethod: state.defaultMoveMethod,
+        planId: state.planId,
         pins: orderedPins(),
         center: state.center,
         zoom: state.zoom
       };
+    }
+
+    function makeShareUrl() {
+      if (state.planId) return makePlanUrl(state.planId);
+      const payload = makePayload();
       return `${location.origin}${location.pathname}#data=${encodePayload(payload)}`;
+    }
+
+    function makeBrowserUrl() {
+      if (state.planId) return makePlanUrl(state.planId);
+      return makeShareUrl();
+    }
+
+    function makePlanUrl(planId) {
+      const url = new URL(`${location.origin}${location.pathname}`);
+      url.searchParams.set("id", planId);
+      return url.toString();
+    }
+
+    function getPlanIdFromUrl() {
+      return new URLSearchParams(location.search).get("id") || "";
+    }
+
+    function makePlanId() {
+      if (crypto.randomUUID) return crypto.randomUUID().slice(0, 8);
+      return Math.random().toString(36).slice(2, 10);
     }
 
     function decodeHash() {
