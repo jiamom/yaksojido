@@ -850,18 +850,19 @@
       }
 
       try {
-        await supabaseRequest(`/rest/v1/${SUPABASE_TABLE}`, {
+        await supabaseRequest(`/rest/v1/${SUPABASE_TABLE}?on_conflict=id`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Prefer: "resolution=merge-duplicates"
+            Prefer: "resolution=merge-duplicates,return=representation"
           },
           body: JSON.stringify([{ id: Number(state.planId), data: makePayload() }])
         });
         persist();
         updateCloudStatus();
         showToast("서버에 저장했습니다. 같은 링크로 최신 내용을 볼 수 있습니다.");
-      } catch {
+      } catch (error) {
+        console.error(error);
         showToast("서버 저장에 실패했습니다. Supabase 설정과 테이블을 확인하세요.");
       }
     }
@@ -891,7 +892,8 @@
         render(true);
         updateCloudStatus();
         showToast("서버에서 최신 약속을 불러왔습니다.");
-      } catch {
+      } catch (error) {
+        console.error(error);
         showToast("서버 불러오기에 실패했습니다.");
       }
     }
@@ -905,9 +907,10 @@
           ...(options.headers || {})
         }
       });
-      if (!response.ok) throw new Error("Supabase request failed");
+      const text = await response.text();
+      if (!response.ok) throw new Error(text || "Supabase request failed");
       if (response.status === 204) return null;
-      return response.json();
+      return text ? JSON.parse(text) : null;
     }
 
     function isCloudConfigured() {
