@@ -214,6 +214,26 @@
       line-height: 1.35;
     }
 
+    .route-panel {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      background: #fff8ef;
+      border: 1px solid #ffd0a3;
+      border-radius: 8px;
+    }
+
+    .route-panel strong {
+      color: #7a390d;
+      line-height: 1.3;
+    }
+
+    .route-panel a {
+      color: var(--blue);
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
     .timeline {
       display: grid;
       gap: 10px;
@@ -500,6 +520,12 @@
       <p class="hint" id="cloudStatus">현재는 이 브라우저와 공유 링크에만 저장됩니다.</p>
       <p class="hint">지도에서 장소를 클릭하거나 검색 결과를 일정에 추가하세요. 추가한 핀은 마우스로 끌어 위치를 조정할 수 있습니다.</p>
 
+      <div class="route-panel" id="routePanel" hidden>
+        <strong>카카오맵 경로</strong>
+        <a id="routeLink" href="#" target="_blank" rel="noopener">카카오맵에서 경로 보기</a>
+        <p class="hint" id="routeSummary"></p>
+      </div>
+
       <div class="section-title">
         <h2>시간대별 장소</h2>
         <span id="pinCount" class="hint">0곳</span>
@@ -593,6 +619,9 @@
       searchResults: document.querySelector("#searchResults"),
       pins: document.querySelector("#pins"),
       count: document.querySelector("#pinCount"),
+      routePanel: document.querySelector("#routePanel"),
+      routeLink: document.querySelector("#routeLink"),
+      routeSummary: document.querySelector("#routeSummary"),
       cloudStatus: document.querySelector("#cloudStatus"),
       newCloudPlan: document.querySelector("#newCloudPlan"),
       saveCloudPlan: document.querySelector("#saveCloudPlan"),
@@ -766,6 +795,7 @@
       renderPins();
       renderMarkers();
       renderRoute();
+      renderRoutePanel();
       if (fitToRoute && state.pins.length) fitMapToPins();
     }
 
@@ -1141,6 +1171,23 @@
         dashArray: "10 8",
         lineJoin: "round"
       }).addTo(map);
+    }
+
+    function renderRoutePanel() {
+      const pins = orderedPins();
+      const routeUrl = makeKakaoRouteUrl();
+      if (pins.length < 2 || !routeUrl) {
+        els.routePanel.hidden = true;
+        els.routeLink.href = "#";
+        els.routeSummary.textContent = "";
+        return;
+      }
+
+      const start = pins[0];
+      const end = pins[pins.length - 1];
+      els.routePanel.hidden = false;
+      els.routeLink.href = routeUrl;
+      els.routeSummary.textContent = `${start.time || "출발"} ${start.name} → ${end.time || "도착"} ${end.name}`;
     }
 
     function editPin(id) {
